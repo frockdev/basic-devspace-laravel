@@ -4,7 +4,7 @@ vars:
   DEVSPACE_ENV_FILE: ".env.infra.override"
   HELM_APP_CHART_REPOSITORY: "git@github.com:vladitot/frock-base-chart.git"
   HELM_LOCAL_VOLUME_CHART_REPOSITORY: "git@github.com:vladitot/frock-local-volume-chart.git"
-  DEVSPACE_REPOSITORY: "git@github.com:vladitot/frock-devspace-base-laravel-chart.git"
+  DEVSPACE_REPOSITORY: "git@github.com:vladitot/frock-devspace-base-laravel.git"
   FROCK_DEV_PACKAGE_REPOSITORY: "git@github.com:vladitot/frock-laravel.git"
   CURRENT_WORKING_DIR:
     command: "bash"
