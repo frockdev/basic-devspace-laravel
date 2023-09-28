@@ -138,7 +138,7 @@ commands:
   install-specified-devspace-laravel:
     command: |-
       specified_infra_version=${1}
-      rm -rf helm && rm -rf devspace-cloned`
+      rm -rf helm && rm -rf devspace-cloned
       git clone "${DEVSPACE_REPOSITORY}" devspace-cloned
       cd devspace-cloned && git checkout ${specified_infra_version} && cd ../
       rm -rf helm && mv devspace-cloned helm && rm -rf helm/.git
