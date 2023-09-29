@@ -1,6 +1,9 @@
 version: v2beta1
 name: "-Your-best-Frock-project-"
 vars:
+  0_A_TOUCH:
+    command: "bash"
+    args: [ "-c", "mkdir -p helm && touch helm/values.yaml && mkdir -p values" ]
   DEVSPACE_ENV_FILE: ".env.infra.override"
   HELM_APP_CHART_REPOSITORY: "https://github.com/vladitot/frock-base-chart.git"
   HELM_LOCAL_VOLUME_CHART_REPOSITORY: "https://github.com/vladitot/frock-local-volume-chart.git"
@@ -23,20 +26,13 @@ vars:
     default: "not-force"
   YQ_RUNNER:
     source: env
-    default: "docker run --rm -v `pwd`/values:/var/www/values -v `pwd`/helm:/var/www/helm -w /var/www mikefarah/yq"
+    default: "docker run --rm -v ${CURRENT_WORKING_DIR}/values:/var/www/values -v ${CURRENT_WORKING_DIR}/helm:/var/www/helm -w /var/www mikefarah/yq"
   INFRA_VERSION:
     command: "bash"
     args: ["-c", "version=$(cat infra_version) && version=${version##*( )} && echo $version"]
   INFRA_VERSION_SEMVER:
     command: "bash"
-    #    args: ["-c", "A=$(cat infra_version); echo ${A:1}"]
     args: ["-c", "A=$(cat infra_version); if [ ${A:0:1} != \"v\" ]; then echo \"0.0.0\"; else echo ${A:1}; fi"]
-  #  APP_NAME:
-  #    command: "bash"
-  #    args: [ "-c", "${YQ_RUNNER} -r '.projectName' helm/values.yaml" ]
-  TOUCH:
-    command: "bash"
-    args: [ "-c", "mkdir -p helm && touch helm/values.yaml && mkdir -p values" ]
   NAMESPACE:
     source: env
     default: ${DEVSPACE_NAME}-local
@@ -344,7 +340,7 @@ commands:
   install-laravel: |-
     rm -rf php/
     mkdir -p php
-    docker run --rm -v ${CURRENT_WORKING_DIR}/php:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=composer vladitot/php82-cli:${INFRA_VERSION}-local create-project --prefer-dist laravel/laravel .
+    docker run --rm -v ${CURRENT_WORKING_DIR}/php:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=composer vladitot/php82-cli:master-local create-project --prefer-dist laravel/laravel .
   
   
   
