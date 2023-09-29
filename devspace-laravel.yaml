@@ -5,10 +5,10 @@ vars:
     command: "bash"
     args: [ "-c", "mkdir -p helm && touch helm/values.yaml && mkdir -p values" ]
   DEVSPACE_ENV_FILE: ".env.infra.override"
-  HELM_APP_CHART_REPOSITORY: "https://github.com/vladitot/frock-base-chart.git"
-  HELM_LOCAL_VOLUME_CHART_REPOSITORY: "https://github.com/vladitot/frock-local-volume-chart.git"
-  DEVSPACE_REPOSITORY: "https://github.com/vladitot/frock-devspace-base-laravel.git"
-  FROCK_DEV_PACKAGE_REPOSITORY: "https://github.com/vladitot/frock-laravel.git"
+  HELM_APP_CHART_REPOSITORY: "https://github.com/frockdev/app-chart.git"
+  HELM_LOCAL_VOLUME_CHART_REPOSITORY: "https://github.com/frockdev/local-volume-chart.git"
+  DEVSPACE_REPOSITORY: "https://github.com/frockdev/basic-devspace-laravel.git"
+  FROCK_DEV_PACKAGE_REPOSITORY: "https://github.com/frockdev/tools-for-laravel.git"
   CURRENT_WORKING_DIR:
     command: "bash"
     args: ["-c", "pwd"]
@@ -107,12 +107,12 @@ commands:
       PACKAGE_VERSION=${INFRA_VERSION}
       if [ ${INFRA_VERSION_SEMVER} == "0.0.0" ]; then PACKAGE_VERSION="dev-${PACKAGE_VERSION}"; fi
       echo $PACKAGE_VERSION
-      docker run --rm -v `pwd`/php:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=composer vladitot/php82-cli:master-local require frock-dev/frock-laravel:${PACKAGE_VERSION} --ignore-platform-reqs
+      docker run --rm -v `pwd`/php:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=composer vladitot/php82-cli:master-local require frock-dev/tools-for-laravel:${PACKAGE_VERSION} --ignore-platform-reqs
 
   install-specified-version-frock-laravel:
     command: |-
       echo "тут надо будет поправить образ"
-      docker run --rm -v `pwd`/php:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=composer vladitot/php82-cli:master-local require frock-dev/frock-laravel:${1} --ignore-platform-reqs
+      docker run --rm -v `pwd`/php:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=composer vladitot/php82-cli:master-local require frock-dev/tools-for-laravel:${1} --ignore-platform-reqs
 
   install-app-helm-chart:
     command: devspace run install-specified-version-app-helm-chart ${INFRA_VERSION}
