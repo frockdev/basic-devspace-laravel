@@ -400,6 +400,7 @@ functions:
 
   render-final-yaml: |-
     echo "lets render final yaml"
+    mkdir -p values
     touch values/secrets.values.yaml 
     touch values/override.values.yaml && ${YQ_RUNNER} eval-all '. as $item ireduce ({}; . * $item)' values/common.values.yaml values/${APPLICATION_ENV}.values.yaml values/override.values.yaml values/secrets.values.yaml > helm/values.yaml
     echo "" >> helm/values.yaml
@@ -407,6 +408,8 @@ functions:
 
   fill-sample-chart-file: |-
     echo lets fill sample chart file
+    mkdir -p helm
+    touch helm/Chart.example.yaml
     rm -rf helm/Chart.yaml
     cp helm/Chart.example.yaml helm/Chart.yaml
     echo "name: ${DEVSPACE_NAME}" >> helm/Chart.yaml
