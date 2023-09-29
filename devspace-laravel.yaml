@@ -36,7 +36,7 @@ vars:
   #    args: [ "-c", "${YQ_RUNNER} -r '.projectName' helm/values.yaml" ]
   VALUES_TOUCH:
     command: "bash"
-    args: [ "-c", "touch helm/values.yaml" ]
+    args: [ "-c", "mkdir -p helm && touch helm/values.yaml" ]
   NAMESPACE:
     source: env
     default: ${DEVSPACE_NAME}-local
