@@ -2,10 +2,10 @@ version: v2beta1
 name: "-Your-best-Frock-project-"
 vars:
   DEVSPACE_ENV_FILE: ".env.infra.override"
-  HELM_APP_CHART_REPOSITORY: "git@github.com:vladitot/frock-base-chart.git"
-  HELM_LOCAL_VOLUME_CHART_REPOSITORY: "git@github.com:vladitot/frock-local-volume-chart.git"
-  DEVSPACE_REPOSITORY: "git@github.com:vladitot/frock-devspace-base-laravel.git"
-  FROCK_DEV_PACKAGE_REPOSITORY: "git@github.com:vladitot/frock-laravel.git"
+  HELM_APP_CHART_REPOSITORY: "https://github.com/vladitot/frock-base-chart.git"
+  HELM_LOCAL_VOLUME_CHART_REPOSITORY: "https://github.com/vladitot/frock-local-volume-chart.git"
+  DEVSPACE_REPOSITORY: "https://github.com/vladitot/frock-devspace-base-laravel.git"
+  FROCK_DEV_PACKAGE_REPOSITORY: "https://github.com/vladitot/frock-laravel.git"
   CURRENT_WORKING_DIR:
     command: "bash"
     args: ["-c", "pwd"]
@@ -132,7 +132,7 @@ commands:
       specified_infra_version=${1}
       rm -rf helm-local-volume && rm -rf helm-cloned
       git clone "${HELM_LOCAL_VOLUME_CHART_REPOSITORY}" helm-cloned
-      cd helm-cloned && git checkout ${specified_infra_version} && cd ../
+      cd helm-cloned && git checkout ${specified_infra_version} > /dev/null 2>&1 && cd ../
       rm -rf helm-local-volume && mv helm-cloned helm-local-volume && rm -rf helm-local-volume/.git
 
   install-specified-devspace-laravel:
@@ -140,7 +140,7 @@ commands:
       specified_infra_version=${1}
       rm -rf devspace && rm -rf devspace-cloned
       git clone "${DEVSPACE_REPOSITORY}" devspace-cloned
-      cd devspace-cloned && git checkout ${specified_infra_version} && cd ../
+      cd devspace-cloned && git checkout ${specified_infra_version} > /dev/null 2>&1 && cd ../
       rm -rf devspace && mv devspace-cloned devspace && rm -rf devspace/.git
 
   install-specified-version-app-helm-chart:
@@ -148,7 +148,7 @@ commands:
       specified_infra_version=${1}
       rm -rf helm && rm -rf helm-cloned
       git clone "${HELM_APP_CHART_REPOSITORY}" helm-cloned
-      cd helm-cloned && git checkout ${specified_infra_version} && cd ../
+      cd helm-cloned && git checkout ${specified_infra_version} > /dev/null 2>&1 && cd ../
       rm -rf helm && mv helm-cloned helm && rm -rf helm/.git
 
   push-infra-everything:
@@ -168,7 +168,7 @@ commands:
     command: |-
       rm -rf helm-cloned
       git clone "${HELM_LOCAL_VOLUME_CHART_REPOSITORY}" helm-cloned
-      cd helm-cloned && git checkout ${INFRA_VERSION} && git checkout -b ${INFRA_VERSION}-update-from-${DEVSPACE_NAME} && cd ../
+      cd helm-cloned && git checkout ${INFRA_VERSION}  > /dev/null 2>&1 && git checkout -b ${INFRA_VERSION}-update-from-${DEVSPACE_NAME} && cd ../
       cd helm-cloned && rm -rf * && cd ../
       cp -r helm-local-volume/* helm-cloned/
       cp -r helm-local-volume/.gitignore helm-cloned/.gitignore
@@ -181,7 +181,7 @@ commands:
     command: |-
       rm -rf devspace-cloned
       git clone "${DEVSPACE_REPOSITORY}" devspace-cloned
-      cd devspace-cloned && git checkout ${INFRA_VERSION} && git checkout -b ${INFRA_VERSION}-update-from-${DEVSPACE_NAME} && cd ../
+      cd devspace-cloned && git checkout ${INFRA_VERSION}  > /dev/null 2>&1 && git checkout -b ${INFRA_VERSION}-update-from-${DEVSPACE_NAME} && cd ../
       cd devspace-cloned && rm -rf * && cd ../
       cp -r devspace/* devspace-cloned/
       cd devspace-cloned && git add . && git commit -m "update to ${INFRA_VERSION}" && cd ../
@@ -193,7 +193,7 @@ commands:
     command: |-
       rm -rf helm-cloned
       git clone "${HELM_APP_CHART_REPOSITORY}" helm-cloned
-      cd helm-cloned && git checkout ${INFRA_VERSION} && git checkout -b ${INFRA_VERSION}-update-from-${DEVSPACE_NAME} && cd ../
+      cd helm-cloned && git checkout ${INFRA_VERSION}  > /dev/null 2>&1 && git checkout -b ${INFRA_VERSION}-update-from-${DEVSPACE_NAME} && cd ../
       cd helm-cloned && rm -rf * && cd ../
       cp -r helm/* helm-cloned/
       cp -r helm/.gitignore helm-cloned/.gitignore
