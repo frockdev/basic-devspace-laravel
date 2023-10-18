@@ -62,53 +62,6 @@ dev:
       containerForDeveloper: "true"
 
 commands:
-  clear-new-service:
-    command: |-
-      rm infra_version || true
-      rm -rf values || true
-      rm -rf helm || true
-      rm .gitignore || true
-      rm -rf php || true
-      rm -rf devspace || true
-
-  create-new-service:
-    command: |-
-      touch infra_version
-      echo "main" > infra_version
-
-      mkdir -p values
-      touch values/.gitignore
-      echo override.values.yaml > values/.gitignore
-      echo secrets.values.yaml >> values/.gitignore
-      touch values/common.values.yaml
-      touch values/local.values.yaml
-      touch values/override.values.yaml
-      touch values/preprod.values.yaml
-      touch values/prod.values.yaml
-      touch values/rc.values.yaml
-      touch values/review.values.yaml
-      touch values/secrets.values.yaml
-
-      touch .gitignore
-      echo ".env.infra.override" > .gitignore
-      echo ".devspace" >> .gitignore
-      echo ".idea" >> .gitignore
-      echo "${DEVSPACE_NAME}.iml" >> .gitignore
-      echo "devspace_installer_remove_if_not_needed_more.yaml" >> .gitignore
-
-      devspace run install-laravel
-
-      devspace run update-to-latest-version
-
-      touch devspace_new.yaml
-      echo "name: \"${DEVSPACE_NAME}\"" > devspace_new.yaml
-      echo "version: v2beta1" >> devspace_new.yaml
-      echo "imports:" >> devspace_new.yaml
-      echo "  - path: devspace/devspace-laravel.yaml" >> devspace_new.yaml
-      echo "    enabled: true" >> devspace_new.yaml
-      mv devspace.yaml devspace_installer_remove_if_not_needed_more.yaml
-      mv devspace_new.yaml devspace.yaml
-
 
   bash: |-
     devspace enter --label-selector "containerForDeveloper=true" --workdir /var/www/php -c main-${DEVSPACE_NAME} -n ${NAMESPACE} bash -- -l
@@ -234,7 +187,7 @@ commands:
       rm -rf devspace && rm -rf devspace-cloned
       git clone "${DEVSPACE_REPOSITORY}" devspace-cloned
       cd devspace-cloned && git checkout ${specified_infra_version} > /dev/null 2>&1 && cd ../
-      rm -rf devspace && mv devspace-cloned devspace && rm -rf devspace/.git
+      rm -rf devspace && mv devspace-cloned devspace && rm -rf devspace/.git && rm -rf devspace/.github
 
   install-specified-version-app-helm-chart:
     command: |-
