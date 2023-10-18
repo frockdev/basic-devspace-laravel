@@ -24,6 +24,9 @@ vars:
   HELM_FORCE_UPGRADE:
     source: env
     default: "not-force"
+  DEV_IMAGE:
+    source: env
+    default: "vladitot/php82-local:${INFRA_VERSION}"
   YQ_RUNNER:
     source: env
     default: "docker run --rm -v ${CURRENT_WORKING_DIR}/values:/var/www/values -v ${CURRENT_WORKING_DIR}/helm:/var/www/helm -w /var/www mikefarah/yq"
@@ -37,14 +40,6 @@ vars:
     source: env
     default: ${DEVSPACE_NAME}-local
 
-#imports:
-#  - path: devspace-pipeline-v2.yaml
-#    enabled: true
-#  - path: devspace-commands.yaml
-#    enabled: true
-#  - path: laravel-commands.yaml
-#    enabled: true
-
 deployments:
   app: # this is main deployable chart. But it builds by special chart below
     namespace: ${NAMESPACE}
@@ -54,37 +49,101 @@ deployments:
       releaseName: ${DEVSPACE_NAME}
       valuesFiles:
         - helm/values.yaml
-      upgradeArgs: [ "--wait", "--history-max", "6", "--set", "infraVersion=${INFRA_VERSION}" ]
+      upgradeArgs:
+        - "--wait"
+        - "--set"
+        - "infraVersion=${INFRA_VERSION}"
 
 dev:
-  sync-php:
-    namespace: ${NAMESPACE}
-    container: main-${DEVSPACE_NAME}
-    labelSelector:
-      syncPhpCode: "true"
-    sync:
-      - path: ./php/:/var/www
-
   app:
     namespace: ${NAMESPACE}
     container: main-${DEVSPACE_NAME}
     labelSelector:
       containerForDeveloper: "true"
-    terminal:
-      command: "bash -l"
-      workDir: /var/www
-      disableReplace: true
-
 
 commands:
+
+  bash: |-
+    devspace enter --label-selector "containerForDeveloper=true" --workdir /var/www/php -c main-${DEVSPACE_NAME} -n ${NAMESPACE} bash -- -l
+
+  bash-xdebug: |-
+    devspace enter --label-selector "containerForDeveloper=true"  --workdir /var/www/php -c main-${DEVSPACE_NAME} -n ${NAMESPACE} bash -- -c "export XDEBUG_MODE=debug && export XDEBUG_SESSION=PHPSTORM && bash -l"
+
+  generate-from-proto:
+    command: |-
+      mkdir -p php/protoGenerated
+      rm -rf php/protoGenerated/*
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:reset-namespaces-in-composer-json
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:prepare-proto-files ${DEVSPACE_NAME}
+      find protoPrepared -name '*.proto' -exec docker run --entrypoint sh --workdir=/var/www/php -v ${CURRENT_WORKING_DIR}:/var/www local/protoc -c "protoc --proto_path=/var/www/protoPrepared --php_out=/var/www/php/protoGenerated --grpc_out=/var/www/php/protoGenerated --php-grpc_out=/var/www/php/protoGenerated --plugin=protoc-gen-php-grpc=/usr/local/go/bin/protoc-gen-php-grpc --plugin=protoc-gen-grpc=/usr/local/go/bin/grpc_php_plugin /var/www/"{} ';'
+      rm -rf ${CURRENT_WORKING_DIR}/protoPrepared
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:add-generated-namespaces-to-composer-json ${DEVSPACE_NAME}
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} install
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:create-endpoints-from-proto
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} install
+
+  build-proto-builder:
+    command: |-
+      docker build -t local/protoc -f images/proto-builder/Dockerfile images/proto-builder
+
+  clear-new-service:
+    command: |-
+      rm infra_version || true
+      rm -rf values || true
+      rm -rf helm || true
+      rm .gitignore || true
+      rm -rf php || true
+      rm -rf devspace || true
+
+  create-new-service:
+    command: |-
+      touch infra_version
+      echo "main" > infra_version
+
+      mkdir -p values
+      touch values/.gitignore
+      echo override.values.yaml > values/.gitignore
+      echo secrets.values.yaml >> values/.gitignore
+      touch values/common.values.yaml
+      touch values/local.values.yaml
+      touch values/override.values.yaml
+      touch values/preprod.values.yaml
+      touch values/prod.values.yaml
+      touch values/rc.values.yaml
+      touch values/review.values.yaml
+      touch values/secrets.values.yaml
+
+      touch .gitignore
+      echo ".env.infra.override" > .gitignore
+      echo ".devspace" >> .gitignore
+      echo ".idea" >> .gitignore
+      echo "${DEVSPACE_NAME}.iml" >> .gitignore
+      echo "devspace_installer_remove_if_not_needed_more.yaml" >> .gitignore
+
+      devspace run install-laravel
+
+      devspace run update-to-latest-version
+
+      touch devspace_new.yaml
+      echo "name: \"${DEVSPACE_NAME}\"" > devspace_new.yaml
+      echo "version: v2beta1" >> devspace_new.yaml
+      echo "imports:" >> devspace_new.yaml
+      echo "  - path: devspace/devspace-laravel.yaml" >> devspace_new.yaml
+      echo "    enabled: true" >> devspace_new.yaml
+      mv devspace.yaml devspace_installer_remove_if_not_needed_more.yaml
+      mv devspace_new.yaml devspace.yaml
+#      devspace run install-filament
+
 
   enable-frock-laravel-dev-mode:
     command: |-
       rm -rf php/frock-laravel
       git clone "${FROCK_DEV_PACKAGE_REPOSITORY}" php/frock-laravel
       cd php/frock-laravel && git checkout main && cd ../../
-      docker run --rm -v `pwd`/php/composer.json:/var/www/composer.json -v `pwd`/php/frock-laravel/frock-dev-install-helper.php:/var/www/frock-dev-install-helper.php --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=bash vladitot/php82-cli:master-local -c "REVERSE=0 php frock-dev-install-helper.php"
-      docker run --rm -v `pwd`/php:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=composer vladitot/php82-cli:master-local update frock-dev/frock-laravel:dev-main --ignore-platform-reqs
+      docker run --rm -v ${CURRENT_WORKING_DIR}/php/composer.json:/var/www/composer.json -v ${CURRENT_WORKING_DIR}/php/frock-laravel/frock-dev-install-helper.php:/var/www/frock-dev-install-helper.php --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=bash ${DEV_IMAGE} -c "REVERSE=0 php frock-dev-install-helper.php"
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} require frock-dev/tools-for-laravel:dev-main --ignore-platform-reqs
+#      rm -rf php/vendor/frock-dev/tools-for-laravel
+#      ln -s ../../frock-laravel php/vendor/frock-dev/tools-for-laravel
 
   check-frock-dev-unstaged:
     command: |-
@@ -102,17 +161,16 @@ commands:
   disable-frock-laravel-dev-mode:
     command: |-
       devspace run check-frock-dev-unstaged || exit 1
-      docker run --rm -v `pwd`/php/composer.json:/var/www/composer.json -v `pwd`/php/frock-laravel/frock-dev-install-helper.php:/var/www/frock-dev-install-helper.php --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=bash vladitot/php82-cli:master-local -c "REVERSE=1 php frock-dev-install-helper.php"
+      docker run --rm -v ${CURRENT_WORKING_DIR}/php/composer.json:/var/www/composer.json -v ${CURRENT_WORKING_DIR}/php/frock-laravel/frock-dev-install-helper.php:/var/www/frock-dev-install-helper.php --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=bash ${DEV_IMAGE} -c "REVERSE=1 php frock-dev-install-helper.php"
       rm -rf php/frock-laravel
       PACKAGE_VERSION=${INFRA_VERSION}
       if [ ${INFRA_VERSION_SEMVER} == "0.0.0" ]; then PACKAGE_VERSION="dev-${PACKAGE_VERSION}"; fi
       echo $PACKAGE_VERSION
-      docker run --rm -v `pwd`/php:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=composer vladitot/php82-cli:master-local require frock-dev/tools-for-laravel:${PACKAGE_VERSION} --ignore-platform-reqs
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} require frock-dev/tools-for-laravel:${PACKAGE_VERSION} --ignore-platform-reqs
 
   install-specified-version-frock-laravel:
     command: |-
-      echo "тут надо будет поправить образ"
-      docker run --rm -v `pwd`/php:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=composer vladitot/php82-cli:master-local require frock-dev/tools-for-laravel:${1} --ignore-platform-reqs
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} require frock-dev/tools-for-laravel:${1} --ignore-platform-reqs
 
   install-app-helm-chart:
     command: devspace run install-specified-version-app-helm-chart ${INFRA_VERSION}
@@ -122,14 +180,6 @@ commands:
 
   install-local-volume-helm-chart:
     command: devspace run install-specified-version-app-helm-chart ${INFRA_VERSION}
-
-  install-specified-version-local-volume-helm-chart:
-    command: |-
-      specified_infra_version=${1}
-      rm -rf helm-local-volume && rm -rf helm-cloned
-      git clone "${HELM_LOCAL_VOLUME_CHART_REPOSITORY}" helm-cloned
-      cd helm-cloned && git checkout ${specified_infra_version} > /dev/null 2>&1 && cd ../
-      rm -rf helm-local-volume && mv helm-cloned helm-local-volume && rm -rf helm-local-volume/.git
 
   install-specified-devspace-laravel:
     command: |-
@@ -151,27 +201,16 @@ commands:
     command: |- 
       devspace run push-changes-app-helm-chart || true
       devspace run push-changes-devspace-laravel || true
-      devspace run push-changes-local-volume-helm-chart || true
       DIR=php/frock-laravel
       if [ -d "$DIR" ];
       then
       devspace run push-changes-frock-laravel || true
-      fi
-      
-      
+      fi  
 
-  push-changes-local-volume-helm-chart:
+  push-changes-frock-laravel:
     command: |-
-      rm -rf helm-cloned
-      git clone "${HELM_LOCAL_VOLUME_CHART_REPOSITORY}" helm-cloned
-      cd helm-cloned && git checkout ${INFRA_VERSION}  > /dev/null 2>&1 && git checkout -b ${INFRA_VERSION}-update-from-${DEVSPACE_NAME} && cd ../
-      cd helm-cloned && rm -rf * && cd ../
-      cp -r helm-local-volume/* helm-cloned/
-      cp -r helm-local-volume/.gitignore helm-cloned/.gitignore
-      cd helm-cloned && git add . && git commit -m "update to ${INFRA_VERSION}" && cd ../
-      cd helm-cloned && git push --force -u origin ${INFRA_VERSION}-update-from-${DEVSPACE_NAME} && cd ../
-    after: |-
-      rm -rf helm-cloned
+      cd php/frock-laravel && git add . && git commit -m "update to ${INFRA_VERSION}" && git checkout -B ${INFRA_VERSION}-update-from-${DEVSPACE_NAME} && git push --force -u origin main && cd ../../
+
 
   push-changes-devspace-laravel:
     command: |-
@@ -180,7 +219,7 @@ commands:
       cd devspace-cloned && git checkout ${INFRA_VERSION}  > /dev/null 2>&1 && git checkout -b ${INFRA_VERSION}-update-from-${DEVSPACE_NAME} && cd ../
       cd devspace-cloned && rm -rf * && cd ../
       cp -r devspace/* devspace-cloned/
-      cd devspace-cloned && git add . && git commit -m "update to ${INFRA_VERSION}" && cd ../
+      cd devspace-cloned && git add . && git commit -m "update to ${INFRA_VERSION}" || true && cd ../
       cd devspace-cloned && git push --force -u origin ${INFRA_VERSION}-update-from-${DEVSPACE_NAME} && cd ../
     after: |-
       rm -rf devspace-cloned
@@ -193,7 +232,7 @@ commands:
       cd helm-cloned && rm -rf * && cd ../
       cp -r helm/* helm-cloned/
       cp -r helm/.gitignore helm-cloned/.gitignore
-      cd helm-cloned && git add . && git commit -m "update to ${INFRA_VERSION}" && cd ../
+      cd helm-cloned && git add . && git commit -m "update to ${INFRA_VERSION}" || true && cd ../
       cd helm-cloned && git push --force -u origin ${INFRA_VERSION}-update-from-${DEVSPACE_NAME} && cd ../
     after: |-
       rm -rf helm-cloned
@@ -214,34 +253,12 @@ commands:
 
 
 
-
-
-
-
   install-local-dependencies: |-
     helm repo add nginx-stable https://helm.nginx.com/stable
     helm repo update
     helm upgrade --install nginx-stable nginx-stable/nginx-ingress --namespace ingress-nginx --create-namespace --version 0.18.1
 
-  build-local-volume: |-
-    rm -rf helm-local-volume/Chart.yaml
-    cp helm-local-volume/ChartTemplate.yaml helm-local-volume/Chart.yaml
-    echo "" >> helm-local-volume/Chart.yaml
-    echo "name: ${DEVSPACE_NAME}-local-volume" >> helm-local-volume/Chart.yaml
-    echo "appVersion: \"v${APP_VERSION}\"" >> helm-local-volume/Chart.yaml
 
-  create-local-volume: |-
-    devspace run build-local-volume
-    cd helm-local-volume/
-    helm upgrade --install --set projectName=${DEVSPACE_NAME} --create-namespace --namespace ${NAMESPACE} "localvolume" .
-  delete-local-volume: |-
-    devspace run build-local-volume
-    cd helm-local-volume/
-    helm uninstall --namespace ${NAMESPACE} "localvolume"
-
-
-  bash: |-
-    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -l
   logs: |-
     devspace logs -f -n ${NAMESPACE}
   restart: |-
@@ -340,7 +357,7 @@ commands:
   install-laravel: |-
     rm -rf php/
     mkdir -p php
-    docker run --rm -v ${CURRENT_WORKING_DIR}/php:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=composer vladitot/php82-cli:master-local create-project --prefer-dist laravel/laravel .
+    docker run --rm -v ${CURRENT_WORKING_DIR}/php:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=composer ${DEV_IMAGE} create-project --prefer-dist laravel/laravel .
   
   
   
@@ -349,61 +366,60 @@ commands:
   
   
 
-  #### START DEPRECATION BLOCK, USED ONLY FOR WIDGET AND OTHER PROJECTS
-  #### DO NOT USE THIS WAY ON NEW PROJECTS
-  composer-install: |-
-    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "cd /var/www && composer install"
-    devspace sync --download-only --config=devspace.yaml --no-watch || true
-  tests: |-
-    devspace run composer-install
-    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "php /var/www/vendor/bin/phpunit"
-  style: |-
-    devspace run composer-install
-    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "php /var/www/vendor/bin/php-cs-fixer fix --diff --dry-run -v --using-cache=no"
-  tests-local: |-
-    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "php /var/www/vendor/bin/phpunit"
-  stat-local: |-
-    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "php /var/www/vendor/bin/phpstan analyse --configuration=phpstan.neon --memory-limit=-1"
-  style-local: |-
-    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "php /var/www/vendor/bin/php-cs-fixer fix --diff --dry-run -v --using-cache=no"
-  ##### END DEPRECATION BLOCK
-  #####
+#  #### START DEPRECATION BLOCK, USED ONLY FOR WIDGET AND OTHER PROJECTS
+#  #### DO NOT USE THIS WAY ON NEW PROJECTS
+#  composer-install: |-
+#    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "cd /var/www && composer install"
+#    devspace sync --download-only --config=devspace.yaml --no-watch || true
+#  tests: |-
+#    devspace run composer-install
+#    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "php /var/www/vendor/bin/phpunit"
+#  style: |-
+#    devspace run composer-install
+#    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "php /var/www/vendor/bin/php-cs-fixer fix --diff --dry-run -v --using-cache=no"
+#  tests-local: |-
+#    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "php /var/www/vendor/bin/phpunit"
+#  stat-local: |-
+#    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "php /var/www/vendor/bin/phpstan analyse --configuration=phpstan.neon --memory-limit=-1"
+#  style-local: |-
+#    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "php /var/www/vendor/bin/php-cs-fixer fix --diff --dry-run -v --using-cache=no"
+#  ##### END DEPRECATION BLOCK
+#  #####
 
-  stat: |-
-    devspace run composer-install
-    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "php /var/www/vendor/bin/phpstan analyse --configuration=phpstan.neon --memory-limit=-1"
-
-  codestyle-check: |-
-    devspace run composer-install
-    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "php /var/www/artisan fixer:fix --diff --dry-run -v --using-cache=no"
-
-  run-parallel-tests: |-
-    devspace run composer-install
-    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "php /var/www/artisan test --parallel --recreate-databases"
-
-  prepare: |-
-    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c " \
-        php /var/www/artisan migrate \
-          && php /var/www/artisan ide-helper:generate \
-          && php /var/www/artisan ide-helper:models -W \
-          && php /var/www/artisan fixer:fix \
-          && make rewrite-doc \
-          && php /var/www/vendor/bin/phpstan analyse --configuration=phpstan.neon
-    "
+#  stat: |-
+#    devspace run composer-install
+#    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "php /var/www/vendor/bin/phpstan analyse --configuration=phpstan.neon --memory-limit=-1"
+#
+#  codestyle-check: |-
+#    devspace run composer-install
+#    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "php /var/www/artisan fixer:fix --diff --dry-run -v --using-cache=no"
+#
+#  run-parallel-tests: |-
+#    devspace run composer-install
+#    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "php /var/www/artisan test --parallel --recreate-databases"
+#
+#  prepare: |-
+#    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c " \
+#        php /var/www/artisan migrate \
+#          && php /var/www/artisan ide-helper:generate \
+#          && php /var/www/artisan ide-helper:models -W \
+#          && php /var/www/artisan fixer:fix \
+#          && make rewrite-doc \
+#          && php /var/www/vendor/bin/phpstan analyse --configuration=phpstan.neon
+#    "
 
 
 functions:
 
   render-final-yaml: |-
-    echo "lets render final yaml"
     mkdir -p values
     touch values/secrets.values.yaml 
     touch values/override.values.yaml && ${YQ_RUNNER} eval-all '. as $item ireduce ({}; . * $item)' values/common.values.yaml values/${APPLICATION_ENV}.values.yaml values/override.values.yaml values/secrets.values.yaml > helm/values.yaml
     echo "" >> helm/values.yaml
     echo "projectName: ${DEVSPACE_NAME}" >> helm/values.yaml
+    echo "localProjectDirectory: ${CURRENT_WORKING_DIR}" >> helm/values.yaml
 
   fill-sample-chart-file: |-
-    echo lets fill sample chart file
     mkdir -p helm
     touch helm/Chart.example.yaml
     rm -rf helm/Chart.yaml
@@ -444,5 +460,5 @@ pipelines:
     stop_dev --all
     purge_deployments app
     run_dependencies --all --pipeline purge
-    helm uninstall -n ${NAMESPACE} ${DEVSPACE_NAME} || true
+    helm uninstall -n ${NAMESPACE} ${DEVSPACE_NAME} > /dev/null 2>&1 || true
 
