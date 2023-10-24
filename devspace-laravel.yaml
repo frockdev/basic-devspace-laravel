@@ -80,7 +80,14 @@ commands:
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:add-generated-namespaces-to-composer-json ${DEVSPACE_NAME}
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} install
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:create-endpoints-from-proto
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:add-to-array-to-grpc-objects
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} install
+      devspace run codegen
+
+  codegen:
+    command: |-
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:register-endpoints
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:load-nats-endpoints
 
   build-proto-builder:
     command: |-
@@ -178,8 +185,8 @@ commands:
   install-devspace-laravel:
     command: devspace run install-specified-devspace-laravel ${INFRA_VERSION}
 
-  install-local-volume-helm-chart:
-    command: devspace run install-specified-version-app-helm-chart ${INFRA_VERSION}
+#  install-local-volume-helm-chart:
+#    command: devspace run install-specified-version-app-helm-chart ${INFRA_VERSION}
 
   install-specified-devspace-laravel:
     command: |-
@@ -245,19 +252,24 @@ commands:
       cd helm-cloned && LATEST=$(git tag -l --sort=-version:refname | head -n 1) && cd ../
       echo ${LATEST} > infra_version
       devspace run install-specified-version-app-helm-chart ${LATEST}
-      devspace run install-local-volume-helm-chart ${LATEST}
       devspace run install-specified-version-frock-laravel ${LATEST}
       devspace run install-specified-devspace-laravel ${LATEST}
     after: |-
       rm -rf helm-cloned
 
+  uninstall-local-nats: |-
+    helm uninstall --namespace nats nats
 
+  install-local-nats: |-
+    helm repo add nats https://nats-io.github.io/k8s/helm/charts/
+    helm upgrade --install nats nats/nats --namespace nats --create-namespace \
+      --set config.jetstream.enabled=true \
+      --set config.jetstream.fileStore.pvc.size=1Gi
 
   install-local-dependencies: |-
     helm repo add nginx-stable https://helm.nginx.com/stable
     helm repo update
     helm upgrade --install nginx-stable nginx-stable/nginx-ingress --namespace ingress-nginx --create-namespace --version 0.18.1
-
 
   logs: |-
     devspace logs -f -n ${NAMESPACE}
