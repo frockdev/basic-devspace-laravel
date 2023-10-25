@@ -201,7 +201,7 @@ commands:
       rm -rf helm && rm -rf helm-cloned
       git clone "${HELM_APP_CHART_REPOSITORY}" helm-cloned
       cd helm-cloned && git checkout ${specified_infra_version} > /dev/null 2>&1 && cd ../
-      rm -rf helm && mv helm-cloned helm && rm -rf helm/.git
+      rm -rf helm && mv helm-cloned helm && rm -rf helm/.git && rm -rf helm/.github
 
   push-infra-everything:
     command: |- 
