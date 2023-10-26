@@ -91,8 +91,11 @@ commands:
     command: |-
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:register-endpoints
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:load-nats-endpoints
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:generate-tests-for-public-methods-on-modules
+  
 
   clear-new-service:
+    internal: true
     command: |-
       rm infra_version || true
       rm -rf values || true
@@ -138,7 +141,7 @@ commands:
       echo "    enabled: true" >> devspace_new.yaml
       mv devspace.yaml devspace_installer_remove_if_not_needed_more.yaml
       mv devspace_new.yaml devspace.yaml
-#      devspace run install-filament
+  #      devspace run install-filament
 
 
   enable-frock-laravel-dev-mode:
@@ -148,8 +151,8 @@ commands:
       cd php/frock-laravel && git checkout main && cd ../../
       docker run --rm -v ${CURRENT_WORKING_DIR}/php/composer.json:/var/www/composer.json -v ${CURRENT_WORKING_DIR}/php/frock-laravel/frock-dev-install-helper.php:/var/www/frock-dev-install-helper.php --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=bash ${DEV_IMAGE} -c "REVERSE=0 php frock-dev-install-helper.php"
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} require frock-dev/tools-for-laravel:dev-main --ignore-platform-reqs
-#      rm -rf php/vendor/frock-dev/tools-for-laravel
-#      ln -s ../../frock-laravel php/vendor/frock-dev/tools-for-laravel
+  #      rm -rf php/vendor/frock-dev/tools-for-laravel
+  #      ln -s ../../frock-laravel php/vendor/frock-dev/tools-for-laravel
 
   check-frock-dev-unstaged:
     command: |-
@@ -184,8 +187,8 @@ commands:
   install-devspace-laravel:
     command: devspace run install-specified-devspace-laravel ${INFRA_VERSION}
 
-#  install-local-volume-helm-chart:
-#    command: devspace run install-specified-version-app-helm-chart ${INFRA_VERSION}
+  #  install-local-volume-helm-chart:
+  #    command: devspace run install-specified-version-app-helm-chart ${INFRA_VERSION}
 
   install-specified-devspace-laravel:
     command: |-
@@ -204,7 +207,7 @@ commands:
       rm -rf helm && mv helm-cloned helm && rm -rf helm/.git && rm -rf helm/.github
 
   push-infra-everything:
-    command: |- 
+    command: |-
       devspace run push-changes-app-helm-chart || true
       devspace run push-changes-devspace-laravel || true
       DIR=php/frock-laravel
@@ -369,13 +372,13 @@ commands:
     rm -rf php/
     mkdir -p php
     docker run --rm -v ${CURRENT_WORKING_DIR}/php:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=composer ${DEV_IMAGE} create-project --prefer-dist laravel/laravel .
-  
-  
-  
-  
-  
-  
-  
+
+
+
+
+
+
+
 
 #  #### START DEPRECATION BLOCK, USED ONLY FOR WIDGET AND OTHER PROJECTS
 #  #### DO NOT USE THIS WAY ON NEW PROJECTS
