@@ -27,6 +27,9 @@ vars:
   DEV_IMAGE:
     source: env
     default: "vladitot/php82-local:${INFRA_VERSION}"
+  PROTOC_IMAGE:
+    source: env
+    default: "vladitot/protoc:${INFRA_VERSION}"
   YQ_RUNNER:
     source: env
     default: "docker run --rm -v ${CURRENT_WORKING_DIR}/values:/var/www/values -v ${CURRENT_WORKING_DIR}/helm:/var/www/helm -w /var/www mikefarah/yq"
@@ -75,7 +78,7 @@ commands:
       rm -rf php/protoGenerated/*
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:reset-namespaces-in-composer-json
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:prepare-proto-files ${DEVSPACE_NAME}
-      find protoPrepared -name '*.proto' -exec docker run --entrypoint sh --workdir=/var/www/php -v ${CURRENT_WORKING_DIR}:/var/www local/protoc -c "protoc --proto_path=/var/www/protoPrepared --php_out=/var/www/php/protoGenerated --grpc_out=/var/www/php/protoGenerated --php-grpc_out=/var/www/php/protoGenerated --plugin=protoc-gen-php-grpc=/usr/local/go/bin/protoc-gen-php-grpc --plugin=protoc-gen-grpc=/usr/local/go/bin/grpc_php_plugin /var/www/"{} ';'
+      find protoPrepared -name '*.proto' -exec docker run --entrypoint sh --workdir=/var/www/php -v ${CURRENT_WORKING_DIR}:/var/www ${PROTOC_IMAGE} -c "protoc --proto_path=/var/www/protoPrepared --php_out=/var/www/php/protoGenerated --grpc_out=/var/www/php/protoGenerated --php-grpc_out=/var/www/php/protoGenerated --plugin=protoc-gen-php-grpc=/usr/local/go/bin/protoc-gen-php-grpc --plugin=protoc-gen-grpc=/usr/local/go/bin/grpc_php_plugin /var/www/"{} ';'
       rm -rf ${CURRENT_WORKING_DIR}/protoPrepared
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:add-generated-namespaces-to-composer-json ${DEVSPACE_NAME}
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} install
@@ -88,12 +91,11 @@ commands:
     command: |-
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:register-endpoints
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:load-nats-endpoints
-
-  build-proto-builder:
-    command: |-
-      docker build -t local/protoc -f images/proto-builder/Dockerfile images/proto-builder
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:generate-tests-for-public-methods-on-modules
+      
 
   clear-new-service:
+    internal: true
     command: |-
       rm infra_version || true
       rm -rf values || true
@@ -202,7 +204,7 @@ commands:
       rm -rf helm && rm -rf helm-cloned
       git clone "${HELM_APP_CHART_REPOSITORY}" helm-cloned
       cd helm-cloned && git checkout ${specified_infra_version} > /dev/null 2>&1 && cd ../
-      rm -rf helm && mv helm-cloned helm && rm -rf helm/.git
+      rm -rf helm && mv helm-cloned helm && rm -rf helm/.git && rm -rf helm/.github
 
   push-infra-everything:
     command: |- 
