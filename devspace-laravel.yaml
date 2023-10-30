@@ -278,34 +278,8 @@ commands:
   restart: |-
     kubectl -n ${NAMESPACE} rollout restart deployment "${DEVSPACE_NAME}-app"
 
-  build-php-82: |-
-    docker build -t vladitot/php82-cli:${INFRA_VERSION}-local -f images/php82/Dockerfile .
-    docker push vladitot/php82-cli:${INFRA_VERSION}-local
-
-  #- name: infra-initial-install
-  #  command: git subtree add --prefix infra git@gitlab.com:near-money/infrastructure-test.git "${INFRA_VERSION}" --squash
-  #- name: infra-pull
-  #  command: git subtree pull --prefix infra git@gitlab.com:near-money/infrastructure-test.git "${INFRA_VERSION}" --squash
-
-  clone-infra-repo-local: |-
-    git clone git@gitlab.com:near-money/infrastructure-test.git infra-tmp-dir
-
-  clone-infra-repo-pipeline: |-
-    git clone https://vladimir117:${PUSH_TOKEN}@gitlab.com/near-money/infrastructure-test.git infra-tmp-dir
-
-  push-infra-pipeline: |-
-    rm -rf infra-tmp-dir
-    devspace run clone-infra-repo-pipeline
-    devspace run prepare-infra-and-push
-    php ./infra/mergeRequestOpener.php
-
-  link:
-    php infra/linkCreator.php
-
-  push-infra: |-
-    rm -rf infra-tmp-dir
-    devspace run clone-infra-repo-local
-    devspace run prepare-infra-and-push
+  nats-cli:
+    command: kubectl run -i --rm --tty nats-box --image=natsio/nats-box --restart=Never
 
   get-app-name: |-
     echo ${DEVSPACE_NAME}
