@@ -141,7 +141,7 @@ commands:
       echo "    enabled: true" >> devspace_new.yaml
       mv devspace.yaml devspace_installer_remove_if_not_needed_more.yaml
       mv devspace_new.yaml devspace.yaml
-  #      devspace run install-filament
+      docker run --rm -v ${CURRENT_WORKING_DIR}/php:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=php ${DEV_IMAGE} php /var/www/artisan vendor:publish --provider="FrockDev\ToolsForLaravel\FrockServiceProvider"
 
 
   enable-frock-laravel-dev-mode:
