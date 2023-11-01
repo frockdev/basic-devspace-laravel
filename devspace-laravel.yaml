@@ -76,7 +76,8 @@ commands:
     command: |-
       mkdir -p php/protoGenerated
       rm -rf php/protoGenerated/*
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:reset-namespaces-in-composer-json
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} /var/www/php/vendor/frock-dev/tools-for-laravel/resetNamespacesInComposerJson.php
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} install
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:prepare-proto-files ${DEVSPACE_NAME}
       find protoPrepared -name '*.proto' -exec docker run --entrypoint sh --workdir=/var/www/php -v ${CURRENT_WORKING_DIR}:/var/www ${PROTOC_IMAGE} -c "protoc --proto_path=/var/www/protoPrepared --php_out=/var/www/php/protoGenerated --grpc_out=/var/www/php/protoGenerated --php-grpc_out=/var/www/php/protoGenerated --plugin=protoc-gen-php-grpc=/usr/local/go/bin/protoc-gen-php-grpc --plugin=protoc-gen-grpc=/usr/local/go/bin/grpc_php_plugin /var/www/"{} ';'
       rm -rf ${CURRENT_WORKING_DIR}/protoPrepared
