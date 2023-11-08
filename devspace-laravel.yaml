@@ -92,6 +92,7 @@ commands:
     command: |-
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:register-endpoints
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:load-nats-endpoints
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:load-http-endpoints
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:generate-tests-for-public-methods-on-modules
   
 
@@ -262,6 +263,19 @@ commands:
 
   uninstall-local-nats: |-
     helm uninstall --namespace nats nats
+
+  uninstall-local-jaeger: |-
+    helm uninstall --namespace jaeger jaeger-all-in-one
+
+  install-local-jaeger: |-
+    helm repo add jaeger-all-in-one https://raw.githubusercontent.com/hansehe/jaeger-all-in-one/master/helm/charts
+    helm install --namespace jaeger --create-namespace jaeger-all-in-one jaeger-all-in-one/jaeger-all-in-one \
+      --set ingress.enabled=true \
+      --set ingress.className=nginx \
+      --set ingress.hosts[0].host=jaeger.localhost \
+      --set ingress.hosts[0].paths[0].path=/ \
+      --set ingress.hosts[0].paths[0].pathType=ImplementationSpecific
+    
 
   install-local-nats: |-
     helm repo add nats https://nats-io.github.io/k8s/helm/charts/
