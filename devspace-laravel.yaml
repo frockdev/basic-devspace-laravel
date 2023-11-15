@@ -5,10 +5,21 @@ vars:
     command: "bash"
     args: [ "-c", "mkdir -p helm && touch helm/values.yaml && mkdir -p values" ]
   DEVSPACE_ENV_FILE: ".env.infra.override"
-  HELM_APP_CHART_REPOSITORY: "https://github.com/frockdev/app-chart.git"
-  HELM_LOCAL_VOLUME_CHART_REPOSITORY: "https://github.com/frockdev/local-volume-chart.git"
-  DEVSPACE_REPOSITORY: "https://github.com/frockdev/basic-devspace-laravel.git"
-  FROCK_DEV_PACKAGE_REPOSITORY: "https://github.com/frockdev/tools-for-laravel.git"
+  HELM_APP_CHART_REPOSITORY:
+    source: env
+    default: "https://github.com/frockdev/app-chart.git"
+  HELM_LOCAL_VOLUME_CHART_REPOSITORY:
+    source: env
+    default: "https://github.com/frockdev/local-volume-chart.git"
+  DEVSPACE_REPOSITORY:
+    source: env
+    default: "https://github.com/frockdev/basic-devspace-laravel.git"
+  FROCK_DEV_PACKAGE_REPOSITORY:
+    source: env
+    default: "https://github.com/frockdev/tools-for-laravel.git"
+  CONTRIBUTOR_NAME:
+    source: env
+    default: "SomeSomeBody"
   CURRENT_WORKING_DIR:
     command: "bash"
     args: ["-c", "pwd"]
@@ -220,18 +231,18 @@ commands:
 
   push-changes-frock-laravel:
     command: |-
-      cd php/frock-laravel && git add . && git commit -m "update to ${INFRA_VERSION}" && git checkout -B ${INFRA_VERSION}-update-from-${DEVSPACE_NAME} && git push --force -u origin main && cd ../../
+      cd php/frock-laravel && git add . && git commit -m "update to ${INFRA_VERSION}" && git checkout -B ${INFRA_VERSION}-update-from-${CONTRIBUTOR_NAME} && git push --force -u origin main && cd ../../
 
 
   push-changes-devspace-laravel:
     command: |-
       rm -rf devspace-cloned
       git clone "${DEVSPACE_REPOSITORY}" devspace-cloned
-      cd devspace-cloned && git checkout ${INFRA_VERSION}  > /dev/null 2>&1 && git checkout -b ${INFRA_VERSION}-update-from-${DEVSPACE_NAME} && cd ../
+      cd devspace-cloned && git checkout ${INFRA_VERSION}  > /dev/null 2>&1 && git checkout -b ${INFRA_VERSION}-update-from-${CONTRIBUTOR_NAME} && cd ../
       cd devspace-cloned && rm -rf * && cd ../
       cp -r devspace/* devspace-cloned/
       cd devspace-cloned && git add . && git commit -m "update to ${INFRA_VERSION}" || true && cd ../
-      cd devspace-cloned && git push --force -u origin ${INFRA_VERSION}-update-from-${DEVSPACE_NAME} && cd ../
+      cd devspace-cloned && git push --force -u origin ${INFRA_VERSION}-update-from-${CONTRIBUTOR_NAME} && cd ../
     after: |-
       rm -rf devspace-cloned
 
@@ -239,12 +250,12 @@ commands:
     command: |-
       rm -rf helm-cloned
       git clone "${HELM_APP_CHART_REPOSITORY}" helm-cloned
-      cd helm-cloned && git checkout ${INFRA_VERSION}  > /dev/null 2>&1 && git checkout -b ${INFRA_VERSION}-update-from-${DEVSPACE_NAME} && cd ../
+      cd helm-cloned && git checkout ${INFRA_VERSION}  > /dev/null 2>&1 && git checkout -b ${INFRA_VERSION}-update-from-${CONTRIBUTOR_NAME} && cd ../
       cd helm-cloned && rm -rf * && cd ../
       cp -r helm/* helm-cloned/
       cp -r helm/.gitignore helm-cloned/.gitignore
       cd helm-cloned && git add . && git commit -m "update to ${INFRA_VERSION}" || true && cd ../
-      cd helm-cloned && git push --force -u origin ${INFRA_VERSION}-update-from-${DEVSPACE_NAME} && cd ../
+      cd helm-cloned && git push --force -u origin ${INFRA_VERSION}-update-from-${CONTRIBUTOR_NAME} && cd ../
     after: |-
       rm -rf helm-cloned
 
@@ -266,6 +277,12 @@ commands:
 
   uninstall-local-jaeger: |-
     helm uninstall --namespace jaeger jaeger-all-in-one
+
+  install-local-ngrok: |-
+    helm repo add ngrok https://ngrok.github.io/kubernetes-ingress-controller
+    helm install ngrok-ingress-controller ngrok/kubernetes-ingress-controller \
+    --set credentials.apiKey=`${YQ_RUNNER} -r '.ngrok.apiToken' values/override.values.yaml` \
+    --set credentials.authtoken=`${YQ_RUNNER} -r '.ngrok.authToken' values/override.values.yaml`
 
   install-local-jaeger: |-
     helm repo add jaeger-all-in-one https://raw.githubusercontent.com/hansehe/jaeger-all-in-one/master/helm/charts
