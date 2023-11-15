@@ -278,9 +278,12 @@ commands:
   uninstall-local-jaeger: |-
     helm uninstall --namespace jaeger jaeger-all-in-one
 
+  uninstall-local-ngrok: |-
+    helm uninstall --namespace ingress-ngrok ngrok-ingress-controller
+
   install-local-ngrok: |-
     helm repo add ngrok https://ngrok.github.io/kubernetes-ingress-controller
-    helm install ngrok-ingress-controller ngrok/kubernetes-ingress-controller \
+    helm install --namespace ingress-ngrok --create-namespace ngrok-ingress-controller ngrok/kubernetes-ingress-controller \
     --set credentials.apiKey=`${YQ_RUNNER} -r '.ngrok.apiToken' values/override.values.yaml` \
     --set credentials.authtoken=`${YQ_RUNNER} -r '.ngrok.authToken' values/override.values.yaml`
 
