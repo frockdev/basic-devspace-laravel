@@ -88,15 +88,15 @@ commands:
       mkdir -p php/protoGenerated
       rm -rf php/protoGenerated/*
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} /var/www/php/vendor/frock-dev/tools-for-laravel/resetNamespacesInComposerJson.php
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} install
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} dumpautoload
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:prepare-proto-files ${DEVSPACE_NAME}
       find protoPrepared -name '*.proto' -exec docker run --entrypoint sh --workdir=/var/www/php -v ${CURRENT_WORKING_DIR}:/var/www ${PROTOC_IMAGE} -c "protoc --proto_path=/var/www/protoPrepared --php_out=/var/www/php/protoGenerated --grpc_out=/var/www/php/protoGenerated --php-grpc_out=/var/www/php/protoGenerated --plugin=protoc-gen-php-grpc=/usr/local/go/bin/protoc-gen-php-grpc --plugin=protoc-gen-grpc=/usr/local/go/bin/grpc_php_plugin /var/www/"{} ';'
       rm -rf ${CURRENT_WORKING_DIR}/protoPrepared
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:add-generated-namespaces-to-composer-json ${DEVSPACE_NAME}
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} install
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} dumpautoload
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:create-endpoints-from-proto
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:add-to-array-to-grpc-objects
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} install
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} dumpautoload
       devspace run codegen
 
   codegen:
@@ -105,6 +105,7 @@ commands:
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:load-nats-endpoints
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:load-http-endpoints
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:generate-tests-for-public-methods-on-modules
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:generate-grafana-metrics
   
 
   clear-new-service:
@@ -295,7 +296,40 @@ commands:
       --set ingress.hosts[0].host=jaeger.localhost \
       --set ingress.hosts[0].paths[0].path=/ \
       --set ingress.hosts[0].paths[0].pathType=ImplementationSpecific
+
+  install-local-grafana: |-
+    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+    echo helm repo add grafana https://grafana.github.io/helm-charts
+    echo helm repo add loki https://grafana.github.io/loki/charts
+    helm repo update
+    helm upgrade --install "prometheus" prometheus-community/kube-prometheus-stack -n prometheus-grafana --create-namespace \
+      -f devspace/prometheus.values.yaml
+    helm upgrade --install "loki" grafana/loki-stack -n prometheus-grafana --create-namespace \
+      --set loki.commonConfig.replication_factor=1 \
+      --set loki.storage.type=filesystem \
+      --set singleBinary.replicas=1 \
+      --set loki.auth_enabled=false
+    docker run --add-host grafana.localhost:`docker run -it --rm --entrypoint bash dersimn/netutils -c "getent hosts host.docker.internal | head -n 1 | cut -d ' ' -f 1"` --rm -i -t -v ${CURRENT_WORKING_DIR}/devspace/terraform:/var/www/devspace/terraform -w /var/www hashicorp/terraform:latest -chdir=/var/www/devspace/terraform/grafana init
+    docker run --add-host grafana.localhost:`docker run -it --rm --entrypoint bash dersimn/netutils -c "getent hosts host.docker.internal | head -n 1 | cut -d ' ' -f 1"` --rm -i -t -v ${CURRENT_WORKING_DIR}/devspace/terraform:/var/www/devspace/terraform -w /var/www hashicorp/terraform:latest -chdir=/var/www/devspace/terraform/grafana apply -auto-approve  
+
+  install-local-boards: |-
+    cp devspace/terraform/grafana/grafanaProvider.tf grafana/terraform/grafanaProvider.tf
+    docker run --add-host grafana.localhost:`docker run -it --rm --entrypoint bash dersimn/netutils -c "getent hosts host.docker.internal | head -n 1 | cut -d ' ' -f 1"` --rm -i -t -v ${CURRENT_WORKING_DIR}/grafana:/var/www/grafana -w /var/www hashicorp/terraform:latest -chdir=/var/www/grafana/terraform init
+    docker run --add-host grafana.localhost:`docker run -it --rm --entrypoint bash dersimn/netutils -c "getent hosts host.docker.internal | head -n 1 | cut -d ' ' -f 1"` --rm -i -t -v ${CURRENT_WORKING_DIR}/grafana:/var/www/grafana -w /var/www hashicorp/terraform:latest -chdir=/var/www/grafana/terraform apply -auto-approve
+
+  uninstall-local-grafana: |-
+    rm -rf devspace/terraform/grafana/terraform.tfstate
+    rm -rf devspace/terraform/grafana/.terraform.lock.hcl
+    rm -rf devspace/terraform/grafana/terraform.tfstate.backup
+    rm -rf devspace/terraform/grafana/.terraform
     
+    rm -rf grafana/terraform/terraform.tfstate
+    rm -rf grafana/terraform/.terraform.lock.hcl
+    rm -rf grafana/terraform/terraform.tfstate.backup
+    rm -rf grafana/terraform/.terraform
+    
+    helm uninstall --namespace prometheus-grafana prometheus
+    helm uninstall --namespace prometheus-grafana loki
 
   install-local-nats: |-
     helm repo add nats https://nats-io.github.io/k8s/helm/charts/
