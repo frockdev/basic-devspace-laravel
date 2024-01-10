@@ -1,0 +1,4 @@
+*
+!.gitignore
+!grafana.tf
+!grafanaProvider.tf

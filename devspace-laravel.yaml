@@ -236,11 +236,11 @@ commands:
     command: |-
       devspace run push-changes-app-helm-chart || true
       devspace run push-changes-devspace-laravel || true
-#      DIR=php/frock-laravel
-#      if [ -d "$DIR" ];
-#      then
-#      devspace run push-changes-frock-laravel || true
-#      fi
+      DIR=php/frock-laravel
+      if [ -d "$DIR" ];
+      then
+      devspace run push-changes-frock-laravel || true
+      fi  
 
   push-changes-frock-laravel:
     description: "Push Frock package to its repository. Use it only if you know what you are doing."
@@ -256,7 +256,7 @@ commands:
       cd devspace-cloned && git checkout ${INFRA_VERSION}  > /dev/null 2>&1 && git checkout -b ${INFRA_VERSION}-update-from-${CONTRIBUTOR_NAME} && cd ../
       cd devspace-cloned && rm -rf * && cd ../
       cp -r devspace/* devspace-cloned/
-      cd devspace-cloned && git add . && git commit -m "update to ${INFRA_VERSION}" || true && cd ../
+      cd devspace-cloned && git add . && git commit -m "update over ${INFRA_VERSION}" || true && cd ../
       cd devspace-cloned && git push --force -u origin ${INFRA_VERSION}-update-from-${CONTRIBUTOR_NAME} && cd ../
     after: |-
       rm -rf devspace-cloned
