@@ -8,9 +8,6 @@ vars:
   HELM_APP_CHART_REPOSITORY:
     source: env
     default: "https://github.com/frockdev/app-chart.git"
-  HELM_LOCAL_VOLUME_CHART_REPOSITORY:
-    source: env
-    default: "https://github.com/frockdev/local-volume-chart.git"
   DEVSPACE_REPOSITORY:
     source: env
     default: "https://github.com/frockdev/basic-devspace-laravel.git"
@@ -77,35 +74,37 @@ dev:
 
 commands:
 
-  bash: |-
-    devspace enter --label-selector "containerForDeveloper=true" --workdir /var/www/php -c main-${DEVSPACE_NAME} -n ${NAMESPACE} bash -- -l
+  bash:
+    description: "Open bash in main container"
+    command: |-
+      devspace enter --label-selector "containerForDeveloper=true" --workdir /var/www/php -c main-${DEVSPACE_NAME} -n ${NAMESPACE} bash -- -l
 
-  bash-xdebug: |-
-    devspace enter --label-selector "containerForDeveloper=true"  --workdir /var/www/php -c main-${DEVSPACE_NAME} -n ${NAMESPACE} bash -- -c "export XDEBUG_MODE=debug && export XDEBUG_SESSION=PHPSTORM && bash -l"
+  bash-xdebug:
+    description: "Open bash in main container with xdebug enabled"
+    command: |-
+      devspace enter --label-selector "containerForDeveloper=true"  --workdir /var/www/php -c main-${DEVSPACE_NAME} -n ${NAMESPACE} bash -- -c "export XDEBUG_MODE=debug && export XDEBUG_SESSION=PHPSTORM && bash -l"
 
   generate-from-proto:
+    description: "Generate php code, endpoints and so on from proto files. Use it each time after you change proto files."
     command: |-
       mkdir -p php/protoGenerated
       rm -rf php/protoGenerated/*
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} /var/www/php/vendor/frock-dev/tools-for-laravel/resetNamespacesInComposerJson.php
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} install
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} dumpautoload
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:prepare-proto-files ${DEVSPACE_NAME}
       find protoPrepared -name '*.proto' -exec docker run --entrypoint sh --workdir=/var/www/php -v ${CURRENT_WORKING_DIR}:/var/www ${PROTOC_IMAGE} -c "protoc --proto_path=/var/www/protoPrepared --php_out=/var/www/php/protoGenerated --grpc_out=/var/www/php/protoGenerated --php-grpc_out=/var/www/php/protoGenerated --plugin=protoc-gen-php-grpc=/usr/local/go/bin/protoc-gen-php-grpc --plugin=protoc-gen-grpc=/usr/local/go/bin/grpc_php_plugin /var/www/"{} ';'
       rm -rf ${CURRENT_WORKING_DIR}/protoPrepared
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:add-generated-namespaces-to-composer-json ${DEVSPACE_NAME}
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} install
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} dumpautoload
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:create-endpoints-from-proto
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:add-to-array-to-grpc-objects
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} install
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} dumpautoload
       devspace run codegen
 
   codegen:
+    description: "Fast codegen command. Use it sometimes after changing app code."
     command: |-
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:register-endpoints
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:load-nats-endpoints
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:load-http-endpoints
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:generate-tests-for-public-methods-on-modules
-  
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:generate-grafana-metrics ${DEVSPACE_NAME}
 
   clear-new-service:
     internal: true
@@ -118,6 +117,7 @@ commands:
       rm -rf devspace || true
 
   create-new-service:
+    description: "Create new service from scratch"
     command: |-
       touch infra_version
       echo "main" > infra_version
@@ -158,16 +158,18 @@ commands:
 
 
   enable-frock-laravel-dev-mode:
+    description: "Set up Frock package for local development."
     command: |-
       rm -rf php/frock-laravel
       git clone "${FROCK_DEV_PACKAGE_REPOSITORY}" php/frock-laravel
       cd php/frock-laravel && git checkout main && cd ../../
       docker run --rm -v ${CURRENT_WORKING_DIR}/php/composer.json:/var/www/composer.json -v ${CURRENT_WORKING_DIR}/php/frock-laravel/frock-dev-install-helper.php:/var/www/frock-dev-install-helper.php --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=bash ${DEV_IMAGE} -c "REVERSE=0 php frock-dev-install-helper.php"
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} require frock-dev/tools-for-laravel:dev-main --ignore-platform-reqs
-  #      rm -rf php/vendor/frock-dev/tools-for-laravel
-  #      ln -s ../../frock-laravel php/vendor/frock-dev/tools-for-laravel
+      rm -rf php/hyperf.php
+      cp -r php/frock-laravel/hyperf.php php/hyperf.php
 
   check-frock-dev-unstaged:
+    description: "Checks files in frock-dev package. Prevents loosing not pushed changes."
     command: |-
       DIR=php/frock-laravel
       if [ -d "$DIR" ];
@@ -181,6 +183,7 @@ commands:
 
 
   disable-frock-laravel-dev-mode:
+    description: "Disable Frock package for local development."
     command: |-
       devspace run check-frock-dev-unstaged || exit 1
       docker run --rm -v ${CURRENT_WORKING_DIR}/php/composer.json:/var/www/composer.json -v ${CURRENT_WORKING_DIR}/php/frock-laravel/frock-dev-install-helper.php:/var/www/frock-dev-install-helper.php --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=bash ${DEV_IMAGE} -c "REVERSE=1 php frock-dev-install-helper.php"
@@ -189,21 +192,29 @@ commands:
       if [ ${INFRA_VERSION_SEMVER} == "0.0.0" ]; then PACKAGE_VERSION="dev-${PACKAGE_VERSION}"; fi
       echo $PACKAGE_VERSION
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} require frock-dev/tools-for-laravel:${PACKAGE_VERSION} --ignore-platform-reqs
+      rm -rf php/hyperf.php
+      cp -r php/vendor/frock-dev/tools-for-laravel/hyperf.php php/hyperf.php
 
   install-specified-version-frock-laravel:
+    description: "Install specified version of Frock package."
     command: |-
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} require frock-dev/tools-for-laravel:${1} --ignore-platform-reqs
+      rm -rf php/hyperf.php
+      cp -r php/vendor/frock-dev/tools-for-laravel/hyperf.php php/hyperf.php
 
   install-app-helm-chart:
+    description: "Download and install fixed in infra_version version of app helm chart."
     command: devspace run install-specified-version-app-helm-chart ${INFRA_VERSION}
 
   install-devspace-laravel:
+    description: "Download and install fixed in infra_version version of devspace-laravel."
     command: devspace run install-specified-devspace-laravel ${INFRA_VERSION}
 
   #  install-local-volume-helm-chart:
   #    command: devspace run install-specified-version-app-helm-chart ${INFRA_VERSION}
 
   install-specified-devspace-laravel:
+    description: "Download and install specified version of devspace-laravel."
     command: |-
       specified_infra_version=${1}
       rm -rf devspace && rm -rf devspace-cloned
@@ -212,6 +223,7 @@ commands:
       rm -rf devspace && mv devspace-cloned devspace && rm -rf devspace/.git && rm -rf devspace/.github
 
   install-specified-version-app-helm-chart:
+    description: "Download and install specified version of app helm chart."
     command: |-
       specified_infra_version=${1}
       rm -rf helm && rm -rf helm-cloned
@@ -220,21 +232,24 @@ commands:
       rm -rf helm && mv helm-cloned helm && rm -rf helm/.git && rm -rf helm/.github
 
   push-infra-everything:
+    description: "Push everything to infra repositories. Use it only if you know what you are doing."
     command: |-
       devspace run push-changes-app-helm-chart || true
       devspace run push-changes-devspace-laravel || true
-      DIR=php/frock-laravel
-      if [ -d "$DIR" ];
-      then
-      devspace run push-changes-frock-laravel || true
-      fi  
+#      DIR=php/frock-laravel
+#      if [ -d "$DIR" ];
+#      then
+#      devspace run push-changes-frock-laravel || true
+#      fi
 
   push-changes-frock-laravel:
+    description: "Push Frock package to its repository. Use it only if you know what you are doing."
     command: |-
       cd php/frock-laravel && git add . && git commit -m "update to ${INFRA_VERSION}" && git checkout -B ${INFRA_VERSION}-update-from-${CONTRIBUTOR_NAME} && git push --force -u origin main && cd ../../
 
 
   push-changes-devspace-laravel:
+    description: "Push devspace-laravel to its repository. Use it only if you know what you are doing."
     command: |-
       rm -rf devspace-cloned
       git clone "${DEVSPACE_REPOSITORY}" devspace-cloned
@@ -247,6 +262,7 @@ commands:
       rm -rf devspace-cloned
 
   push-changes-app-helm-chart:
+    description: "Push app helm chart to its repository. Use it only if you know what you are doing."
     command: |-
       rm -rf helm-cloned
       git clone "${HELM_APP_CHART_REPOSITORY}" helm-cloned
@@ -260,6 +276,7 @@ commands:
       rm -rf helm-cloned
 
   update-to-latest-version:
+    description: "Main command to update everything to latest version: devspace-laravel, app-chart, frock package."
     command: |-
       devspace purge
       rm -rf helm-cloned
@@ -267,170 +284,142 @@ commands:
       cd helm-cloned && LATEST=$(git tag -l --sort=-version:refname | head -n 1) && cd ../
       echo ${LATEST} > infra_version
       devspace run install-specified-version-app-helm-chart ${LATEST}
-      devspace run install-specified-version-frock-laravel ${LATEST}
       devspace run install-specified-devspace-laravel ${LATEST}
+      devspace run install-specified-version-frock-laravel ${LATEST}
     after: |-
       rm -rf helm-cloned
 
-  uninstall-local-nats: |-
-    helm uninstall --namespace nats nats
+  uninstall-local-nats:
+    description: "Uninstall local nats"
+    command: |-
+      helm uninstall --namespace nats nats
 
-  uninstall-local-jaeger: |-
-    helm uninstall --namespace jaeger jaeger-all-in-one
+  uninstall-local-jaeger:
+    description: "Uninstall local jaeger"
+    command: |-
+      helm uninstall --namespace jaeger jaeger-all-in-one
 
-  uninstall-local-ngrok: |-
-    helm uninstall --namespace ingress-ngrok ngrok-ingress-controller
+  uninstall-local-ngrok:
+    description: "Uninstall local ngrok"
+    command: |-
+      helm uninstall --namespace ingress-ngrok ngrok-ingress-controller
 
-  install-local-ngrok: |-
-    helm repo add ngrok https://ngrok.github.io/kubernetes-ingress-controller
-    helm install --namespace ingress-ngrok --create-namespace ngrok-ingress-controller ngrok/kubernetes-ingress-controller \
-    --set credentials.apiKey=`${YQ_RUNNER} -r '.ngrok.apiToken' values/override.values.yaml` \
-    --set credentials.authtoken=`${YQ_RUNNER} -r '.ngrok.authToken' values/override.values.yaml`
+  install-local-ngrok:
+    description: "Install local ngrok"
+    command: |-
+      helm repo add ngrok https://ngrok.github.io/kubernetes-ingress-controller
+      helm install --namespace ingress-ngrok --create-namespace ngrok-ingress-controller ngrok/kubernetes-ingress-controller \
+      --set credentials.apiKey=`${YQ_RUNNER} -r '.ngrok.apiToken' values/override.values.yaml` \
+      --set credentials.authtoken=`${YQ_RUNNER} -r '.ngrok.authToken' values/override.values.yaml`
 
-  install-local-jaeger: |-
-    helm repo add jaeger-all-in-one https://raw.githubusercontent.com/hansehe/jaeger-all-in-one/master/helm/charts
-    helm install --namespace jaeger --create-namespace jaeger-all-in-one jaeger-all-in-one/jaeger-all-in-one \
-      --set ingress.enabled=true \
-      --set ingress.className=nginx \
-      --set ingress.hosts[0].host=jaeger.localhost \
-      --set ingress.hosts[0].paths[0].path=/ \
-      --set ingress.hosts[0].paths[0].pathType=ImplementationSpecific
-    
+  install-local-jaeger:
+    description: "Install local jaeger"
+    command: |-
+      helm repo add jaeger-all-in-one https://raw.githubusercontent.com/hansehe/jaeger-all-in-one/master/helm/charts
+      helm install --namespace jaeger --create-namespace jaeger-all-in-one jaeger-all-in-one/jaeger-all-in-one \
+        --set ingress.enabled=true \
+        --set ingress.className=nginx \
+        --set ingress.hosts[0].host=jaeger.localhost \
+        --set ingress.hosts[0].paths[0].path=/ \
+        --set ingress.hosts[0].paths[0].pathType=ImplementationSpecific
 
-  install-local-nats: |-
-    helm repo add nats https://nats-io.github.io/k8s/helm/charts/
-    helm upgrade --install nats nats/nats --namespace nats --create-namespace \
-      --set config.jetstream.enabled=true \
-      --set config.jetstream.fileStore.pvc.size=1Gi
+  install-local-grafana:
+    description: "Install local grafana"
+    command: |-
+      helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      echo helm repo add grafana https://grafana.github.io/helm-charts
+      echo helm repo add loki https://grafana.github.io/loki/charts
+      helm repo update
+      helm upgrade --install "prometheus" prometheus-community/kube-prometheus-stack -n prometheus-grafana --create-namespace \
+        -f devspace/prometheus.values.yaml
+      helm upgrade --install "loki" grafana/loki-stack -n prometheus-grafana --create-namespace \
+        --set loki.commonConfig.replication_factor=1 \
+        --set loki.storage.type=filesystem \
+        --set singleBinary.replicas=1 \
+        --set loki.auth_enabled=false
+      docker run --add-host grafana.localhost:`docker run -it --rm --entrypoint bash dersimn/netutils -c "getent hosts host.docker.internal | head -n 1 | cut -d ' ' -f 1"` --rm -i -t -v ${CURRENT_WORKING_DIR}/devspace/terraform:/var/www/devspace/terraform -w /var/www hashicorp/terraform:latest -chdir=/var/www/devspace/terraform/grafana init
+      docker run --add-host grafana.localhost:`docker run -it --rm --entrypoint bash dersimn/netutils -c "getent hosts host.docker.internal | head -n 1 | cut -d ' ' -f 1"` --rm -i -t -v ${CURRENT_WORKING_DIR}/devspace/terraform:/var/www/devspace/terraform -w /var/www hashicorp/terraform:latest -chdir=/var/www/devspace/terraform/grafana apply -auto-approve  
 
-  install-local-dependencies: |-
-    helm repo add nginx-stable https://helm.nginx.com/stable
-    helm repo update
-    helm upgrade --install nginx-stable nginx-stable/nginx-ingress --namespace ingress-nginx --create-namespace --version 0.18.1
+  install-grafana-boards:
+    description: "Install grafana boards"
+    command: |-
+      cp devspace/terraform/grafana/grafanaProvider.tf grafana/terraform/grafanaProvider.tf
+      docker run --add-host grafana.localhost:`docker run -it --rm --entrypoint bash dersimn/netutils -c "getent hosts host.docker.internal | head -n 1 | cut -d ' ' -f 1"` --rm -i -t -v ${CURRENT_WORKING_DIR}/grafana:/var/www/grafana -w /var/www hashicorp/terraform:latest -chdir=/var/www/grafana/terraform init
+      docker run --add-host grafana.localhost:`docker run -it --rm --entrypoint bash dersimn/netutils -c "getent hosts host.docker.internal | head -n 1 | cut -d ' ' -f 1"` --rm -i -t -v ${CURRENT_WORKING_DIR}/grafana:/var/www/grafana -w /var/www hashicorp/terraform:latest -chdir=/var/www/grafana/terraform apply -auto-approve
 
-  logs: |-
-    devspace logs -f -n ${NAMESPACE}
-  restart: |-
-    kubectl -n ${NAMESPACE} rollout restart deployment "${DEVSPACE_NAME}-app"
+  uninstall-local-grafana:
+    description: "Uninstall local grafana"
+    command: |-
+      rm -rf devspace/terraform/grafana/terraform.tfstate
+      rm -rf devspace/terraform/grafana/.terraform.lock.hcl
+      rm -rf devspace/terraform/grafana/terraform.tfstate.backup
+      rm -rf devspace/terraform/grafana/.terraform
+      
+      rm -rf grafana/terraform/terraform.tfstate
+      rm -rf grafana/terraform/.terraform.lock.hcl
+      rm -rf grafana/terraform/terraform.tfstate.backup
+      rm -rf grafana/terraform/.terraform
+      
+      helm uninstall --namespace prometheus-grafana prometheus
+      helm uninstall --namespace prometheus-grafana loki
+
+  install-local-nats:
+    description: "Install local nats"
+    command: |-
+      helm repo add nats https://nats-io.github.io/k8s/helm/charts/
+      helm upgrade --install nats nats/nats --namespace nats --create-namespace \
+        --set config.jetstream.enabled=true \
+        --set config.jetstream.fileStore.pvc.size=1Gi
+
+  install-local-cluster-dependencies:
+    description: "Install local-cluster dependencies. Nginx or something."
+    command: |-
+      helm repo add nginx-stable https://helm.nginx.com/stable
+      helm repo update
+      helm upgrade --install nginx-stable nginx-stable/nginx-ingress --namespace ingress-nginx --create-namespace --version 0.18.1
+
+  logs:
+    description: "Show logs from main container"
+    command: |-
+      devspace logs -f -n ${NAMESPACE}
+
+#  restart: |-
+#    kubectl -n ${NAMESPACE} rollout restart deployment "${DEVSPACE_NAME}-app"
 
   nats-cli:
+    description: "Run nats cli"
     command: kubectl run -i --rm --tty nats-box --image=natsio/nats-box --restart=Never
 
-  get-app-name: |-
-    echo ${DEVSPACE_NAME}
-  get-namespace: |-
-    echo ${NAMESPACE}
-  get-xdebug-host: |-
-    echo ${XDEBUG_HOST}
-  remove-local-volume: |-
-    helm uninstall --namespace ${NAMESPACE} localvolume || true
-  initialize: |-
-    devspace run install-ingress
-    devspace run create-local-volume
-  initialize2: |-
-    cd infra/cdk8s/ && npm install && cd ../../
-    devspace run remove-local-volume
-    devspace run install-ingress
-    devspace run create-local-volume
-  get-infra-version: |-
-    echo ${INFRA_VERSION}
-  get-primary-image: |-
-    echo ${PRIMARY_IMAGE}
-  get-secondary-image: |-
-    echo ${SECONDARY_IMAGE}
-  generate-manifests: |-
-    cd infra/cdk8s && npm run compile && npm run synth
-  generate-manifests-directly: |-
-    rm -rf infra/cdk8s/main.ts
-    rm -rf infra/cdk8s/main.js
-    rm -rf infra/cdk8s/main.d.ts
-    cp infra/cdk8s/${DEVSPACE_NAME}.ts infra/cdk8s/main.ts
-    if [[ $DEPLOYMENT_ENV != "local" ]]
-    then
-      if [[ $CLUSTER != "xdebug" ]]
-      then
-        cd infra/cdk8s && npm install && cd ../../
-      fi
-    fi
-    [ ! -d "infra/cdk8s" ] && cd infra/cdk8s && npm install && cd ../../
-    cd infra/cdk8s && npm run compile && node main.js && cd ../../
-    rm -rf infra/cdk8s/main.ts
-    rm -rf infra/cdk8s/main.js
-    rm -rf infra/cdk8s/main.d.ts
-  env: |-
-    env
-  #- name: kobra-graph
-  #  command: kobra graph --reference "${APP_NAME}=master&widget=ops-test4"
-  #secrets: |-
-  #  WORKDIR=infra/projects/${APP_NAME}/kustomize/base
-  #  if [[ $CLUSTER == "gcp" ]]
-  #  then
-  #    GOOGLE_APPLICATION_CREDENTIALS=$SOPS_KEY sops -d ${WORKDIR}/configmaps/${DEPLOYMENT_ENV}.env > ${WORKDIR}/.configmap
-  #  else
-  #    AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY SOPS_KMS_ARN=$SOPS_KMS_ARN sops -d ${WORKDIR}/configmaps/aws-${DEPLOYMENT_ENV}.env > ${WORKDIR}/.configmap
-  #  fi
-
-
-
-
+  get-app-name:
+    description: "Get app name"
+    command: |-
+      echo ${DEVSPACE_NAME}
+  get-namespace:
+    description: "Get namespace"
+    command: |-
+      echo ${NAMESPACE}
+  get-xdebug-host:
+    description: "Get xdebug host"
+    command: |-
+      echo ${XDEBUG_HOST}
+  initialize:
+    description: "Initialize local development environment. Install ingress, create local volume or smt."
+    command: |-
+      devspace run install-ingress
+  get-infra-version:
+    description: "Get infra version"
+    command: |-
+      echo ${INFRA_VERSION}
 
   #####
   # frock.dev commands
   #####
-  install-laravel: |-
-    rm -rf php/
-    mkdir -p php
-    docker run --rm -v ${CURRENT_WORKING_DIR}/php:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=composer ${DEV_IMAGE} create-project --prefer-dist laravel/laravel .
-
-
-
-
-
-
-
-
-#  #### START DEPRECATION BLOCK, USED ONLY FOR WIDGET AND OTHER PROJECTS
-#  #### DO NOT USE THIS WAY ON NEW PROJECTS
-#  composer-install: |-
-#    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "cd /var/www && composer install"
-#    devspace sync --download-only --config=devspace.yaml --no-watch || true
-#  tests: |-
-#    devspace run composer-install
-#    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "php /var/www/vendor/bin/phpunit"
-#  style: |-
-#    devspace run composer-install
-#    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "php /var/www/vendor/bin/php-cs-fixer fix --diff --dry-run -v --using-cache=no"
-#  tests-local: |-
-#    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "php /var/www/vendor/bin/phpunit"
-#  stat-local: |-
-#    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "php /var/www/vendor/bin/phpstan analyse --configuration=phpstan.neon --memory-limit=-1"
-#  style-local: |-
-#    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "php /var/www/vendor/bin/php-cs-fixer fix --diff --dry-run -v --using-cache=no"
-#  ##### END DEPRECATION BLOCK
-#  #####
-
-#  stat: |-
-#    devspace run composer-install
-#    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "php /var/www/vendor/bin/phpstan analyse --configuration=phpstan.neon --memory-limit=-1"
-#
-#  codestyle-check: |-
-#    devspace run composer-install
-#    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "php /var/www/artisan fixer:fix --diff --dry-run -v --using-cache=no"
-#
-#  run-parallel-tests: |-
-#    devspace run composer-install
-#    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c "php /var/www/artisan test --parallel --recreate-databases"
-#
-#  prepare: |-
-#    devspace enter --label-selector "terminal-container=terminal" -c primary -n ${NAMESPACE} bash -- -c " \
-#        php /var/www/artisan migrate \
-#          && php /var/www/artisan ide-helper:generate \
-#          && php /var/www/artisan ide-helper:models -W \
-#          && php /var/www/artisan fixer:fix \
-#          && make rewrite-doc \
-#          && php /var/www/vendor/bin/phpstan analyse --configuration=phpstan.neon
-#    "
-
+  install-laravel:
+    description: "Install laravel. Do only if you know what you are doing."
+    command: |-
+      rm -rf php/
+      mkdir -p php
+      docker run --rm -v ${CURRENT_WORKING_DIR}/php:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=composer ${DEV_IMAGE} create-project --prefer-dist laravel/laravel .
 
 functions:
 
