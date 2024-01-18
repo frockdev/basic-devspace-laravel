@@ -50,6 +50,18 @@ vars:
   NAMESPACE:
     source: env
     default: ${DEVSPACE_NAME}-local
+  CI_APP_TAG:
+    source: env
+    default: warumDarum
+  IMAGE_PULL_SECRET_REGISTRY:
+    source: env
+    default: "empty.empty"
+  IMAGE_PULL_SECRET_USERNAME:
+    source: env
+    default: "user.empty"
+  IMAGE_PULL_SECRET_PASSWORD:
+    source: env
+    default: "password.empty"
 
 deployments:
   app: # this is main deployable chart. But it builds by special chart below
@@ -62,8 +74,6 @@ deployments:
         - helm/values.yaml
       upgradeArgs:
         - "--wait"
-        - "--set"
-        - "infraVersion=${INFRA_VERSION}"
 
 dev:
   app:
@@ -105,6 +115,11 @@ commands:
     description: "Fast codegen command. Use it sometimes after changing app code."
     command: |-
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:generate-grafana-metrics ${DEVSPACE_NAME}
+
+  build-production:
+    description: "Build application image"
+    command: |-
+      docker build --file Dockerfile --build-arg LOCAL_IMAGE=${DEV_IMAGE} --build-arg BASE_IMAGE=${DEV_IMAGE} --tag ${1} --target production ${CURRENT_WORKING_DIR}
 
   clear-new-service:
     internal: true
@@ -390,6 +405,15 @@ commands:
     description: "Run nats cli"
     command: kubectl run -i --rm --tty nats-box --image=natsio/nats-box --restart=Never
 
+  get-dev-image:
+    description: "Get dev image"
+    command: |-
+      echo ${DEV_IMAGE}
+
+  get-app-env:
+    description: "Get app env"
+    command: |-
+      echo ${APPLICATION_ENV}
   get-app-name:
     description: "Get app name"
     command: |-
@@ -428,8 +452,15 @@ functions:
     touch values/secrets.values.yaml 
     touch values/override.values.yaml && ${YQ_RUNNER} eval-all '. as $item ireduce ({}; . * $item)' values/common.values.yaml values/${APPLICATION_ENV}.values.yaml values/override.values.yaml values/secrets.values.yaml > helm/values.yaml
     echo "" >> helm/values.yaml
+    echo "applicationEnv: ${APPLICATION_ENV}" >> helm/values.yaml
     echo "projectName: ${DEVSPACE_NAME}" >> helm/values.yaml
     echo "localProjectDirectory: ${CURRENT_WORKING_DIR}" >> helm/values.yaml
+    echo "infraVersion: ${INFRA_VERSION}" >> helm/values.yaml
+    echo "ciAppTag: ${CI_APP_TAG}" >> helm/values.yaml
+    echo "imagePullCredentials: " >> helm/values.yaml
+    echo "  username: ${IMAGE_PULL_SECRET_USERNAME}" >> helm/values.yaml
+    echo "  password: ${IMAGE_PULL_SECRET_PASSWORD}" >> helm/values.yaml
+    echo "  registry: ${IMAGE_PULL_SECRET_REGISTRY}" >> helm/values.yaml
 
   fill-sample-chart-file: |-
     mkdir -p helm
