@@ -34,7 +34,7 @@ vars:
     default: "not-force"
   DEV_IMAGE:
     source: env
-    default: "vladitot/php82-hyperf-swoole-local:${INFRA_VERSION}"
+    default: "vladitot/php83-swow-local:${INFRA_VERSION}"
   PROTOC_IMAGE:
     source: env
     default: "vladitot/protoc:${INFRA_VERSION}"
