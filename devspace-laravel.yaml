@@ -180,8 +180,8 @@ commands:
       cd php/frock-laravel && git checkout main && cd ../../
       docker run --rm -v ${CURRENT_WORKING_DIR}/php/composer.json:/var/www/composer.json -v ${CURRENT_WORKING_DIR}/php/frock-laravel/frock-dev-install-helper.php:/var/www/frock-dev-install-helper.php --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=bash ${DEV_IMAGE} -c "REVERSE=0 php frock-dev-install-helper.php"
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} require frock-dev/tools-for-laravel:dev-main --ignore-platform-reqs
-      rm -rf php/hyperf.php
-      cp -r php/frock-laravel/hyperf.php php/hyperf.php
+      rm -rf php/frock.php
+      cp -r php/frock-laravel/frock.php php/frock.php
 
   check-frock-dev-unstaged:
     description: "Checks files in frock-dev package. Prevents loosing not pushed changes."
@@ -207,15 +207,15 @@ commands:
       if [ ${INFRA_VERSION_SEMVER} == "0.0.0" ]; then PACKAGE_VERSION="dev-${PACKAGE_VERSION}"; fi
       echo $PACKAGE_VERSION
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} require frock-dev/tools-for-laravel:${PACKAGE_VERSION} --ignore-platform-reqs
-      rm -rf php/hyperf.php
-      cp -r php/vendor/frock-dev/tools-for-laravel/hyperf.php php/hyperf.php
+      rm -rf php/frock.php
+      cp -r php/vendor/frock-dev/tools-for-laravel/frock.php php/frock.php
 
   install-specified-version-frock-laravel:
     description: "Install specified version of Frock package."
     command: |-
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} require frock-dev/tools-for-laravel:${1} --ignore-platform-reqs
-      rm -rf php/hyperf.php
-      cp -r php/vendor/frock-dev/tools-for-laravel/hyperf.php php/hyperf.php
+      rm -rf php/frock.php
+      cp -r php/vendor/frock-dev/tools-for-laravel/frock.php php/frock.php
 
   install-app-helm-chart:
     description: "Download and install fixed in infra_version version of app helm chart."
