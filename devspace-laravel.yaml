@@ -145,6 +145,7 @@ commands:
       touch values/local.values.yaml
       touch values/override.values.yaml
       touch values/preprod.values.yaml
+      touch values/tests.values.yaml
       touch values/prod.values.yaml
       touch values/rc.values.yaml
       touch values/review.values.yaml
