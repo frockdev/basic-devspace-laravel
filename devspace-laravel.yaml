@@ -171,6 +171,13 @@ commands:
       mv devspace_new.yaml devspace.yaml
       docker run --rm -v ${CURRENT_WORKING_DIR}/php:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=php ${DEV_IMAGE} php /var/www/artisan vendor:publish --provider="FrockDev\ToolsForLaravel\FrockServiceProvider"
 
+  enbl:
+    command: |-
+      devspace run enable-frock-laravel-dev-mode
+
+  dsbl:
+    command: |-
+      devspace run disable-frock-laravel-dev-mode
 
   enable-frock-laravel-dev-mode:
     description: "Set up Frock package for local development."
