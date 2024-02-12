@@ -94,27 +94,18 @@ commands:
     command: |-
       devspace enter --label-selector "containerForDeveloper=true"  --workdir /var/www/php -c main-${DEVSPACE_NAME} -n ${NAMESPACE} bash -- -c "export XDEBUG_MODE=debug && export XDEBUG_SESSION=PHPSTORM && bash -l"
 
-  generate-from-proto:
-    description: "Generate php code, endpoints and so on from proto files. Use it each time after you change proto files."
+  generate-endpoints:
+    description: "Create endpoints from proto files. Use it each time after you change proto files."
     command: |-
-      mkdir -p php/protoGenerated
-      rm -rf php/protoGenerated/*
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} /var/www/php/vendor/frock-dev/tools-for-laravel/resetNamespacesInComposerJson.php
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} frock.php frock:add-proto-classmap-to-composer-json 
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} dumpautoload
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:prepare-proto-files ${DEVSPACE_NAME}
-      find protoPrepared -name '*.proto' -exec docker run --entrypoint sh --workdir=/var/www/php -v ${CURRENT_WORKING_DIR}:/var/www ${PROTOC_IMAGE} -c "protoc --proto_path=/var/www/protoPrepared --php_out=/var/www/php/protoGenerated --grpc_out=/var/www/php/protoGenerated --php-grpc_out=/var/www/php/protoGenerated --plugin=protoc-gen-php-grpc=/usr/local/go/bin/protoc-gen-php-grpc --plugin=protoc-gen-grpc=/usr/local/go/bin/grpc_php_plugin /var/www/"{} ';'
-      rm -rf ${CURRENT_WORKING_DIR}/protoPrepared
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:add-generated-namespaces-to-composer-json ${DEVSPACE_NAME}
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} dumpautoload
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:create-endpoints-from-proto
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:add-to-array-to-grpc-objects
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} dumpautoload
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} frock.php frock:generate-endpoints 
       devspace run codegen
 
   codegen:
     description: "Fast codegen command. Use it sometimes after changing app code."
     command: |-
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} artisan frock:generate-grafana-metrics ${DEVSPACE_NAME}
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} frock.php frock:generate-grafana-metrics ${DEVSPACE_NAME}
 
   build-production:
     description: "Build application image"
@@ -189,7 +180,9 @@ commands:
       docker run --rm -v ${CURRENT_WORKING_DIR}/php/composer.json:/var/www/composer.json -v ${CURRENT_WORKING_DIR}/php/frock-laravel/frock-dev-install-helper.php:/var/www/frock-dev-install-helper.php --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=bash ${DEV_IMAGE} -c "REVERSE=0 php frock-dev-install-helper.php"
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} require frock-dev/tools-for-laravel:dev-main --ignore-platform-reqs
       rm -rf php/frock.php
+      rm -rf php/frock-server.php
       cp -r php/frock-laravel/frock.php php/frock.php
+      cp -r php/frock-laravel/frock-server.php php/frock-server.php
 
   check-frock-dev-unstaged:
     description: "Checks files in frock-dev package. Prevents loosing not pushed changes."
@@ -216,14 +209,18 @@ commands:
       echo $PACKAGE_VERSION
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} require frock-dev/tools-for-laravel:${PACKAGE_VERSION} --ignore-platform-reqs
       rm -rf php/frock.php
+      rm -rf php/frock-server.php
       cp -r php/vendor/frock-dev/tools-for-laravel/frock.php php/frock.php
+      cp -r php/vendor/frock-dev/tools-for-laravel/frock-server.php php/frock-server.php
 
   install-specified-version-frock-laravel:
     description: "Install specified version of Frock package."
     command: |-
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} require frock-dev/tools-for-laravel:${1} --ignore-platform-reqs
       rm -rf php/frock.php
+      rm -rf php/frock-server.php
       cp -r php/vendor/frock-dev/tools-for-laravel/frock.php php/frock.php
+      cp -r php/vendor/frock-dev/tools-for-laravel/frock-server.php php/frock-server.php
 
   install-app-helm-chart:
     description: "Download and install fixed in infra_version version of app helm chart."
