@@ -178,7 +178,7 @@ commands:
       git clone "${FROCK_DEV_PACKAGE_REPOSITORY}" php/frock-laravel
       cd php/frock-laravel && git checkout main && cd ../../
       docker run --rm -v ${CURRENT_WORKING_DIR}/php/composer.json:/var/www/composer.json -v ${CURRENT_WORKING_DIR}/php/frock-laravel/frock-dev-install-helper.php:/var/www/frock-dev-install-helper.php --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=bash ${DEV_IMAGE} -c "REVERSE=0 php frock-dev-install-helper.php"
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} require frock-dev/tools-for-laravel:dev-main --ignore-platform-reqs
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} require frock-dev/tools-for-laravel:dev-main --with-all-dependencies
       rm -rf php/frock.php
       rm -rf php/frock-server.php
       cp -r php/frock-laravel/frock.php php/frock.php
@@ -207,7 +207,7 @@ commands:
       PACKAGE_VERSION=${INFRA_VERSION}
       if [ ${INFRA_VERSION_SEMVER} == "0.0.0" ]; then PACKAGE_VERSION="dev-${PACKAGE_VERSION}"; fi
       echo $PACKAGE_VERSION
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} require frock-dev/tools-for-laravel:${PACKAGE_VERSION} --ignore-platform-reqs
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} require frock-dev/tools-for-laravel:${PACKAGE_VERSION} --with-all-dependencies
       rm -rf php/frock.php
       rm -rf php/frock-server.php
       cp -r php/vendor/frock-dev/tools-for-laravel/frock.php php/frock.php
@@ -216,7 +216,7 @@ commands:
   install-specified-version-frock-laravel:
     description: "Install specified version of Frock package."
     command: |-
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} require frock-dev/tools-for-laravel:${1} --ignore-platform-reqs
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} require frock-dev/tools-for-laravel:${1} --with-all-dependencies
       rm -rf php/frock.php
       rm -rf php/frock-server.php
       cp -r php/vendor/frock-dev/tools-for-laravel/frock.php php/frock.php
