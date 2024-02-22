@@ -32,6 +32,9 @@ vars:
   HELM_FORCE_UPGRADE:
     source: env
     default: "not-force"
+  BASE_BUILD_IMAGE:
+    source: env
+    default: "vladitot/php83-swow-ubuntu-base:${INFRA_VERSION}"
   DEV_IMAGE:
     source: env
     default: "vladitot/php83-swow-ubuntu-local:${INFRA_VERSION}"
@@ -404,6 +407,11 @@ commands:
     description: "Get dev image"
     command: |-
       echo ${DEV_IMAGE}
+
+  get-base-image:
+    description: "Get base build image"
+    command: |-
+      echo ${BASE_BUILD_IMAGE}
 
   get-app-env:
     description: "Get app env"
