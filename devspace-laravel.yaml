@@ -97,15 +97,15 @@ commands:
   generate-endpoints:
     description: "Create endpoints from proto files. Use it each time after you change proto files."
     command: |-
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} frock.php frock:add-proto-classmap-to-composer-json 
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} /var/www/php/vendor/bin/frock.php frock:add-proto-classmap-to-composer-json 
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} dumpautoload
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} frock.php frock:generate-endpoints 
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} /var/www/php/vendor/bin/frock.php frock:generate-endpoints 
       devspace run codegen
 
   codegen:
     description: "Fast codegen command. Use it sometimes after changing app code."
     command: |-
-      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} frock.php frock:generate-grafana-metrics ${DEVSPACE_NAME}
+      docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=php ${DEV_IMAGE} /var/www/php/vendor/bin/frock.php frock:generate-grafana-metrics ${DEVSPACE_NAME}
 
   build-production:
     description: "Build application image"
@@ -179,10 +179,6 @@ commands:
       cd php/frock-laravel && git checkout main && cd ../../
       docker run --rm -v ${CURRENT_WORKING_DIR}/php/composer.json:/var/www/composer.json -v ${CURRENT_WORKING_DIR}/php/frock-laravel/frock-dev-install-helper.php:/var/www/frock-dev-install-helper.php --user=${CURRENT_LOCAL_USER} --workdir=/var/www --entrypoint=bash ${DEV_IMAGE} -c "REVERSE=0 php frock-dev-install-helper.php"
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} require frock-dev/tools-for-laravel:dev-main --with-all-dependencies
-      rm -rf php/frock.php
-      rm -rf php/frock-server.php
-      cp -r php/frock-laravel/frock.php php/frock.php
-      cp -r php/frock-laravel/frock-server.php php/frock-server.php
 
   check-frock-dev-unstaged:
     description: "Checks files in frock-dev package. Prevents loosing not pushed changes."
@@ -208,19 +204,13 @@ commands:
       if [ ${INFRA_VERSION_SEMVER} == "0.0.0" ]; then PACKAGE_VERSION="dev-${PACKAGE_VERSION}"; fi
       echo $PACKAGE_VERSION
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} require frock-dev/tools-for-laravel:${PACKAGE_VERSION} --with-all-dependencies
-      rm -rf php/frock.php
-      rm -rf php/frock-server.php
-      cp -r php/vendor/frock-dev/tools-for-laravel/frock.php php/frock.php
-      cp -r php/vendor/frock-dev/tools-for-laravel/frock-server.php php/frock-server.php
+
 
   install-specified-version-frock-laravel:
     description: "Install specified version of Frock package."
     command: |-
       docker run --rm -v ${CURRENT_WORKING_DIR}:/var/www --user=${CURRENT_LOCAL_USER} --workdir=/var/www/php --entrypoint=composer ${DEV_IMAGE} require frock-dev/tools-for-laravel:${1} --with-all-dependencies
-      rm -rf php/frock.php
-      rm -rf php/frock-server.php
-      cp -r php/vendor/frock-dev/tools-for-laravel/frock.php php/frock.php
-      cp -r php/vendor/frock-dev/tools-for-laravel/frock-server.php php/frock-server.php
+
 
   install-app-helm-chart:
     description: "Download and install fixed in infra_version version of app helm chart."
